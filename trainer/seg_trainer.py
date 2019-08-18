@@ -2,10 +2,12 @@ import numpy as np
 import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
+from model.metric import Evaluator
 from utils import inf_loop
+from model.metric import SegEvaluator
 
 
-class Trainer(BaseTrainer):
+class SegTrainer(BaseTrainer):
     """
     Trainer class
 
@@ -13,10 +15,11 @@ class Trainer(BaseTrainer):
         Inherited from BaseTrainer.
     """
 
-    def __init__(self, model, loss, evaluator, optimizer, config, data_loader,
+    def __init__(self, model, loss, evaluator: SegEvaluator, optimizer, config, nclass, data_loader,
                  valid_data_loader=None, lr_scheduler=None, len_epoch=None):
         super().__init__(model, loss, evaluator, optimizer, config)
         self.config = config
+        self.ncalss = nclass
         self.data_loader = data_loader
         if len_epoch is None:
             # epoch-based training
@@ -62,6 +65,7 @@ class Trainer(BaseTrainer):
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
             self.writer.add_scalar('loss', loss.item())
             total_loss += loss.item()
+            # total_metrics += self._eval_metrics(output, target)
             self.evaluator.add_batch(target, output)
 
             if batch_idx % self.log_step == 0:
@@ -117,6 +121,7 @@ class Trainer(BaseTrainer):
                 self.writer.add_scalar('loss', loss.item())
                 total_val_loss += loss.item()
                 self.evaluator.add_batch(target, output)
+                # total_val_metrics += self._eval_metrics(output, target)
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
 
         for i, metric in enumerate(self.evaluator):

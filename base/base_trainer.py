@@ -8,7 +8,7 @@ class BaseTrainer:
     """
     Base class for all trainers
     """
-    def __init__(self, model, loss, metrics, optimizer, config):
+    def __init__(self, model, loss, evaluator, optimizer, config):
         self.config = config
         self.logger = config.get_logger('trainer', config['trainer']['verbosity'])
 
@@ -19,7 +19,7 @@ class BaseTrainer:
             self.model = torch.nn.DataParallel(model, device_ids=device_ids)
 
         self.loss = loss
-        self.metrics = metrics
+        self.evaluator = evaluator
         self.optimizer = optimizer
 
         cfg_trainer = config['trainer']
@@ -42,7 +42,7 @@ class BaseTrainer:
 
         self.checkpoint_dir = config.save_dir
 
-        # setup visualization writer instance                
+        # setup visualization writer instance
         self.writer = TensorboardWriter(config.log_dir, self.logger, cfg_trainer['tensorboard'])
 
         if config.resume is not None:
@@ -68,9 +68,9 @@ class BaseTrainer:
             log = {'epoch': epoch}
             for key, value in result.items():
                 if key == 'metrics':
-                    log.update({mtr.__name__: value[i] for i, mtr in enumerate(self.metrics)})
+                    log.update({mtr.__name__: value[i] for i, mtr in enumerate(self.evaluator)})
                 elif key == 'val_metrics':
-                    log.update({'val_' + mtr.__name__: value[i] for i, mtr in enumerate(self.metrics)})
+                    log.update({'val_' + mtr.__name__: value[i] for i, mtr in enumerate(self.evaluator)})
                 else:
                     log[key] = value
 
