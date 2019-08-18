@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from base import BaseModel
+import segmentation_models_pytorch as smp
 
 
 class MnistModel(BaseModel):
@@ -20,3 +21,25 @@ class MnistModel(BaseModel):
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
         return F.log_softmax(x, dim=1)
+
+
+class Unet_resnet34(BaseModel):
+    def __init__(self, nclass=5):
+        super().__init__()
+        self.model = smp.Unet('resnet34', classes=nclass, activation=None)
+        # model = smp.Unet('resnet34', classes=3, activation='softmax')
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class Unet_resnet50(BaseModel):
+    def __init__(self, nclass=5):
+        super().__init__()
+        self.model = smp.Unet('resnet50', classes=nclass, activation=None)
+        # model = smp.Unet('resnet34', classes=3, activation='softmax')
+
+    def forward(self, x):
+        return self.model(x)
+
+

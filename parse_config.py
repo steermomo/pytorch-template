@@ -57,6 +57,7 @@ class ConfigParser:
         finds a function handle with the name given as 'type' in config, and returns the 
         instance initialized with corresponding keyword args given as 'args'.
         """
+        # print(name)
         module_name = self[name]['type']
         module_args = dict(self[name]['args'])
         assert all([k not in module_args for k in kwargs]), 'Overwriting kwargs given in config file is not allowed'

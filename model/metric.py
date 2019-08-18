@@ -11,6 +11,9 @@ class ClasEvaluator(object):
             self.Accuracy_Class
         ]
 
+    def __len__(self):
+        return 2
+
     def Accuracy(self):
         Acc = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
         return Acc
@@ -28,6 +31,7 @@ class ClasEvaluator(object):
         return confusion_matrix
 
     def add_batch(self, gt_label, pre_label):
+        # print(gt_label.shape, pre_label.shape)
         assert gt_label.shape == pre_label.shape
         self.confusion_matrix += self._generate_matrix(gt_label, pre_label)
 
@@ -46,10 +50,13 @@ class SegEvaluator(object):
         self.metric = [
             self.Pixel_Accuracy,
             self.Pixel_Accuracy_Class,
-            self.Mean_Intersection_over_Union,
+            self.MIoU,
             self.Dice,
-            self.Frequency_Weighted_Intersection_over_Union
+            self.FWIoU
         ]
+
+    def __len__(self):
+        return len(self.metric)
 
     def Pixel_Accuracy(self):
         Acc = np.diag(self.confusion_matrix).sum() / self.confusion_matrix.sum()
@@ -60,7 +67,7 @@ class SegEvaluator(object):
         Acc = np.nanmean(Acc)
         return Acc
 
-    def Mean_Intersection_over_Union(self):
+    def MIoU(self):
         MIoU = np.diag(self.confusion_matrix) / (
             np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
             np.diag(self.confusion_matrix))
@@ -75,7 +82,7 @@ class SegEvaluator(object):
         dice = 2 * insert / (label + pred)
         return np.mean(dice[1:])  # background不算
 
-    def Frequency_Weighted_Intersection_over_Union(self):
+    def FWIoU(self):
         freq = np.sum(self.confusion_matrix, axis=1) / np.sum(self.confusion_matrix)
         iu = np.diag(self.confusion_matrix) / (
             np.sum(self.confusion_matrix, axis=1) + np.sum(self.confusion_matrix, axis=0) -
@@ -92,15 +99,20 @@ class SegEvaluator(object):
         return confusion_matrix
 
     def add_batch(self, gt_image, pre_image):
+        # print(gt_image.shape, pre_image.shape)
         assert gt_image.shape == pre_image.shape
         self.confusion_matrix += self._generate_matrix(gt_image, pre_image)
 
     def reset(self):
         self.confusion_matrix = np.zeros((self.num_class,) * 2)
 
-    def __iter__(self):
-        for fuc in self.metric:
-            return fuc
+    def __getitem__(self, idx):
+        return self.metric[idx]
+    # def __iter__(self):
+    #     return self 
+    # def __next__(self):
+    #     for fuc in self.metric:
+    #         return fuc
 
 
 def my_metric(output, target):

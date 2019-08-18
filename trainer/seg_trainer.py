@@ -2,7 +2,8 @@ import numpy as np
 import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
-from model.metric import Evaluator
+# from model.metric import Evaluator
+from tqdm import tqdm
 from utils import inf_loop
 from model.metric import SegEvaluator
 
@@ -15,11 +16,11 @@ class SegTrainer(BaseTrainer):
         Inherited from BaseTrainer.
     """
 
-    def __init__(self, model, loss, evaluator: SegEvaluator, optimizer, config, nclass, data_loader,
+    def __init__(self, model, loss, evaluator: SegEvaluator, optimizer, config, data_loader,
                  valid_data_loader=None, lr_scheduler=None, len_epoch=None):
         super().__init__(model, loss, evaluator, optimizer, config)
         self.config = config
-        self.ncalss = nclass
+        # self.ncalss = nclass
         self.data_loader = data_loader
         if len_epoch is None:
             # epoch-based training
@@ -53,7 +54,9 @@ class SegTrainer(BaseTrainer):
         self.evaluator.reset()
         total_loss = 0
         total_metrics = np.zeros(len(self.evaluator))
-        for batch_idx, (data, target) in enumerate(self.data_loader):
+        tbar = tqdm(self.data_loader, ascii=True)
+        for batch_idx, sample in enumerate(tbar):
+            data, target = sample['image'], sample['label']
             data, target = data.to(self.device), target.to(self.device)
 
             self.optimizer.zero_grad()
@@ -65,7 +68,13 @@ class SegTrainer(BaseTrainer):
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
             self.writer.add_scalar('loss', loss.item())
             total_loss += loss.item()
-            # total_metrics += self._eval_metrics(output, target)
+
+            tbar.set_description('Train loss: %.3f' % (total_loss / (batch_idx + 1)))
+
+            output = output.data.cpu().numpy()
+            target = target.cpu().numpy()
+            output = np.argmax(output, axis=1)
+
             self.evaluator.add_batch(target, output)
 
             if batch_idx % self.log_step == 0:
@@ -77,6 +86,9 @@ class SegTrainer(BaseTrainer):
 
             if batch_idx == self.len_epoch:
                 break
+
+        print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.data_loader.batch_size + data.data.shape[0]))
+        print('Loss: %.5f' % total_loss)
 
         for i, metric in enumerate(self.evaluator):
             mtr_val = metric()
@@ -111,7 +123,9 @@ class SegTrainer(BaseTrainer):
         total_val_loss = 0
         total_val_metrics = np.zeros(len(self.evaluator))
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(self.valid_data_loader):
+            tbar = tqdm(self.valid_data_loader, desc='\r', ascii=True)
+            for batch_idx, sample in enumerate(tbar):
+                data, target = sample['image'], sample['label']
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
@@ -120,9 +134,19 @@ class SegTrainer(BaseTrainer):
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.writer.add_scalar('loss', loss.item())
                 total_val_loss += loss.item()
+
+                tbar.set_description('Test  loss: %.3f' % (total_val_loss / (batch_idx + 1)))
+
+                output = output.data.cpu().numpy()
+                target = target.cpu().numpy()
+                output = np.argmax(output, axis=1)
+
                 self.evaluator.add_batch(target, output)
                 # total_val_metrics += self._eval_metrics(output, target)
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+
+        print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.valid_data_loader.batch_size + data.data.shape[0]))
+        print('Loss: %.5f' % total_val_loss)
 
         for i, metric in enumerate(self.evaluator):
             mtr_val = metric()

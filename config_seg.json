@@ -1,21 +1,21 @@
 {
-    "name": "Mnist_LeNet",
+    "name": "Kaggle_steel",
     "n_gpu": 1,
 
     "arch": {
-        "type": "MnistModel",
+        "type": "Unet_resnet34",
         "args": {}
     },
     "data_loader": {
         "type": "make_data_loader",
         "args":{
             "dataset": "steel",
-            "data_dir": "data/",
-            "batch_size": 128,
+            "data_dir": "/data2/hangli_data/kaggle/steel/data",
+            "batch_size": 40,
             "shuffle": true,
             "num_workers": 2,
-            "base_size": [512, 512],
-            "crop_size": [512, 512]
+            "base_size": [256, 1600],
+            "crop_size": [128, 800]
         }
     },
     "optimizer": {
@@ -51,7 +51,7 @@
 
         "save_dir": "saved/",
         "save_period": 1,
-        "verbosity": 2,
+        "verbosity": 1,
         
         "monitor": "min val_loss",
         "early_stop": 10,

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torchvision.utils import make_grid
 from base import BaseTrainer
+from tqdm import tqdm
 from utils import inf_loop
 
 
@@ -50,7 +51,9 @@ class Trainer(BaseTrainer):
         self.evaluator.reset()
         total_loss = 0
         total_metrics = np.zeros(len(self.evaluator))
-        for batch_idx, (data, target) in enumerate(self.data_loader):
+        tbar = tqdm(self.data_loader, ascii=True)
+        for batch_idx, sample in enumerate(tbar):
+            data, target = sample['image'], sample['label']
             data, target = data.to(self.device), target.to(self.device)
 
             self.optimizer.zero_grad()
@@ -62,6 +65,9 @@ class Trainer(BaseTrainer):
             self.writer.set_step((epoch - 1) * self.len_epoch + batch_idx)
             self.writer.add_scalar('loss', loss.item())
             total_loss += loss.item()
+
+            tbar.set_description('Train loss: %.3f' % (total_loss / (batch_idx + 1)))
+
             self.evaluator.add_batch(target, output)
 
             if batch_idx % self.log_step == 0:
@@ -73,6 +79,8 @@ class Trainer(BaseTrainer):
 
             if batch_idx == self.len_epoch:
                 break
+        print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.data_loader.batch_size + data.data.shape[0]))
+        print('Loss: %.5f' % total_loss)
 
         for i, metric in enumerate(self.evaluator):
             mtr_val = metric()
@@ -107,7 +115,9 @@ class Trainer(BaseTrainer):
         total_val_loss = 0
         total_val_metrics = np.zeros(len(self.evaluator))
         with torch.no_grad():
-            for batch_idx, (data, target) in enumerate(self.valid_data_loader):
+            tbar = tqdm(self.valid_data_loader, desc='\r', ascii=True)
+            for batch_idx, sample in enumerate(tbar):
+                data, target = sample['image'], sample['label']
                 data, target = data.to(self.device), target.to(self.device)
 
                 output = self.model(data)
@@ -116,8 +126,14 @@ class Trainer(BaseTrainer):
                 self.writer.set_step((epoch - 1) * len(self.valid_data_loader) + batch_idx, 'valid')
                 self.writer.add_scalar('loss', loss.item())
                 total_val_loss += loss.item()
+
+                tbar.set_description('Test loss: %.3f' % (total_val_loss / (batch_idx + 1)))
+
                 self.evaluator.add_batch(target, output)
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+
+        print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.valid_data_loader.batch_size + data.data.shape[0]))
+        print('Loss: %.5f' % total_val_loss)
 
         for i, metric in enumerate(self.evaluator):
             mtr_val = metric()

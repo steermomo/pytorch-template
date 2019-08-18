@@ -1,6 +1,7 @@
 import torch.nn.functional as F
 import torch
 import torch.nn as nn
+from model.lovasz_losses import lovasz_softmax
 
 
 def nll_loss(output, target):
@@ -32,6 +33,22 @@ class ClassificationLosses(object):
             loss /= n
 
         return loss
+
+    def lovasz_loss(probas, labels, classes='present', per_image=False, ignore=None):
+        """
+        Multi-class Lovasz-Softmax loss
+        probas: [B, C, H, W] Variable, class probabilities at each prediction (between 0 and 1).
+                Interpreted as binary (sigmoid) output with outputs of size [B, H, W].
+        labels: [B, H, W] Tensor, ground truth labels (between 0 and C - 1)
+        classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+        per_image: compute the loss per image instead of per batch
+        ignore: void class labels
+        """  
+        probas = torch.softmax(probas, dim=1)
+        loss = lovasz_softmax(probas, labels)
+        return loss
+    
+
 
 
 class SegmentationLosses(object):
