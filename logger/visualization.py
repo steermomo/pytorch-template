@@ -48,6 +48,9 @@ class TensorboardWriter():
             duration = self.timer.check()
             self.add_scalar('steps_per_sec', 1 / duration)
 
+    def add_scalar_with_tag(self, tag, value, step):
+        self.writer.add_scalar(tag, value, step)
+
     def __getattr__(self, name):
         """
         If visualization is configured to use:

@@ -34,6 +34,9 @@ def decode_segmap(label_mask, dataset, plot=False):
     elif dataset == 'dlut':
         n_classes = 2
         label_colours = get_dlut_labels()
+    elif dataset == 'steel':
+        n_classes = 5
+        label_colours = get_steel_labels()
     else:
         raise NotImplementedError
 
@@ -76,6 +79,16 @@ def get_cuhk_labels():
     return np.array([
         [0, 0, 0],
         [255, 255, 255],
+    ])
+
+
+def get_steel_labels():
+    return np.array([
+        [255, 255, 255],
+        [0, 255, 0],
+        [255, 0, 0],
+        [0, 0, 255],
+        [255, 255, 0]
     ])
 
 

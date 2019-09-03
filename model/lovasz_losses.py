@@ -150,7 +150,7 @@ def binary_xloss(logits, labels, ignore=None):
 # --------------------------- MULTICLASS LOSSES ---------------------------
 
 
-def lovasz_softmax(probas, labels, classes='present', per_image=False, ignore=None):
+def lovasz_softmax(probas, labels, classes='present', per_image=False, ignore=None, weights=None):
     """
     Multi-class Lovasz-Softmax loss
       probas: [B, C, H, W] Variable, class probabilities at each prediction (between 0 and 1).
@@ -164,11 +164,11 @@ def lovasz_softmax(probas, labels, classes='present', per_image=False, ignore=No
         loss = mean(lovasz_softmax_flat(*flatten_probas(prob.unsqueeze(0), lab.unsqueeze(0), ignore), classes=classes)
                           for prob, lab in zip(probas, labels))
     else:
-        loss = lovasz_softmax_flat(*flatten_probas(probas, labels, ignore), classes=classes)
+        loss = lovasz_softmax_flat(*flatten_probas(probas, labels, ignore), classes=classes, weights=None)
     return loss
 
 
-def lovasz_softmax_flat(probas, labels, classes='present'):
+def lovasz_softmax_flat(probas, labels, classes='present', weights=None):
     """
     Multi-class Lovasz-Softmax loss
       probas: [P, C] Variable, class probabilities at each prediction (between 0 and 1)
@@ -181,9 +181,11 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
     C = probas.size(1)
     losses = []
     class_to_sum = list(range(C)) if classes in ['all', 'present'] else classes
-    for c in class_to_sum:
-        fg = (labels == c).float() # foreground for class c
-        if (classes is 'present' and fg.sum() == 0):
+    if weights is None:
+        weights = torch.ones(C)
+    for c, w in zip(class_to_sum, weights):
+        fg = (labels == c).float()  # foreground for class c
+        if (classes == 'present' and fg.sum() == 0):
             continue
         if C == 1:
             if len(classes) > 1:
@@ -195,7 +197,7 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
         errors_sorted, perm = torch.sort(errors, 0, descending=True)
         perm = perm.data
         fg_sorted = fg[perm]
-        losses.append(torch.dot(errors_sorted, Variable(lovasz_grad(fg_sorted))))
+        losses.append(torch.dot(errors_sorted, Variable(lovasz_grad(fg_sorted))) * w)
     return mean(losses)
 
 

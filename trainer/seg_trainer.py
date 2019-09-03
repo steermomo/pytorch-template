@@ -5,6 +5,7 @@ from base import BaseTrainer
 # from model.metric import Evaluator
 from tqdm import tqdm
 from utils import inf_loop
+from data_loader.utils import decode_seg_map_sequence
 from model.metric import SegEvaluator
 
 
@@ -20,6 +21,7 @@ class SegTrainer(BaseTrainer):
                  valid_data_loader=None, lr_scheduler=None, len_epoch=None):
         super().__init__(model, loss, evaluator, optimizer, config)
         self.config = config
+        self.dataset = config['data_loader']['args']['dataset']
         # self.ncalss = nclass
         self.data_loader = data_loader
         if len_epoch is None:
@@ -32,7 +34,7 @@ class SegTrainer(BaseTrainer):
         self.valid_data_loader = valid_data_loader
         self.do_validation = self.valid_data_loader is not None
         self.lr_scheduler = lr_scheduler
-        self.log_step = int(np.sqrt(data_loader.batch_size))
+        self.log_step = int(np.sqrt(len(data_loader)) * 2)
 
     def _train_epoch(self, epoch):
         """
@@ -50,6 +52,8 @@ class SegTrainer(BaseTrainer):
 
             The metrics in log must have the key 'metrics'.
         """
+        if self.lr_scheduler is not None:
+            print(f'lr: {self.lr_scheduler.get_lr()}')
         self.model.train()
         self.evaluator.reset()
         total_loss = 0
@@ -82,22 +86,30 @@ class SegTrainer(BaseTrainer):
                     epoch,
                     self._progress(batch_idx),
                     loss.item()))
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                self.writer.add_image('input', make_grid(data.cpu()[:4], nrow=2, normalize=True))
+                grid = make_grid(decode_seg_map_sequence(output[:4], dataset=self.dataset), nrow=2, normalize=False)
+                self.writer.add_image('pred', grid)
+                grid = make_grid(decode_seg_map_sequence(target[:4], dataset=self.dataset), nrow=2, normalize=False)
+                self.writer.add_image('label', grid)
 
             if batch_idx == self.len_epoch:
                 break
 
+        if epoch == 0:
+            self.data_loader.dataset.set_use_cache(True)
+        
         print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.data_loader.batch_size + data.data.shape[0]))
         print('Loss: %.5f' % total_loss)
-
+        self.writer.add_scalar_with_tag('loss_epoch/train', total_loss, epoch)
         for i, metric in enumerate(self.evaluator):
             mtr_val = metric()
             total_metrics[i] = mtr_val
-            self.writer.add_scalar('{}'.format(metric.__name__), mtr_val)
+            self.writer.add_scalar_with_tag(f'train/{metric.__name__}', mtr_val, epoch)
 
         log = {
             'loss': total_loss / self.len_epoch,
-            'metrics': (total_metrics / self.len_epoch).tolist()
+            # 'metrics': (total_metrics / self.len_epoch).tolist()
+            'metrics': total_metrics.tolist()
         }
 
         if self.do_validation:
@@ -106,6 +118,7 @@ class SegTrainer(BaseTrainer):
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
+            
 
         return log
 
@@ -118,6 +131,7 @@ class SegTrainer(BaseTrainer):
         Note:
             The validation metrics in log must have the key 'val_metrics'.
         """
+        log_step = int(np.sqrt(len(self.valid_data_loader)) * 2)
         self.model.eval()
         self.evaluator.reset()
         total_val_loss = 0
@@ -142,23 +156,33 @@ class SegTrainer(BaseTrainer):
                 output = np.argmax(output, axis=1)
 
                 self.evaluator.add_batch(target, output)
-                # total_val_metrics += self._eval_metrics(output, target)
-                self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+                if batch_idx % log_step == 0:
+                    # total_val_metrics += self._eval_metrics(output, target)
+                    self.writer.add_image('input', make_grid(data.cpu()[:4], nrow=2, normalize=True))
+                    grid = make_grid(decode_seg_map_sequence(output[:4], dataset=self.dataset), nrow=2, normalize=False)
+                    self.writer.add_image('pred', grid)
+                    grid = make_grid(decode_seg_map_sequence(target[:4], dataset=self.dataset), nrow=2, normalize=False)
+                    self.writer.add_image('label', grid)
 
         print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.valid_data_loader.batch_size + data.data.shape[0]))
         print('Loss: %.5f' % total_val_loss)
+        self.writer.add_scalar_with_tag('loss_epoch/val', total_val_loss, epoch)
+
+        if epoch == 0:
+            self.valid_data_loader.dataset.set_use_cache(True)
 
         for i, metric in enumerate(self.evaluator):
             mtr_val = metric()
             total_val_metrics[i] = mtr_val
-            self.writer.add_scalar('val_{}'.format(metric.__name__), mtr_val)
+            self.writer.add_scalar_with_tag(f'val/{metric.__name__}', mtr_val, epoch)
         # add histogram of model parameters to the tensorboard
-        for name, p in self.model.named_parameters():
-            self.writer.add_histogram(name, p, bins='auto')
-
+        # for name, p in self.model.named_parameters():
+        #     self.writer.add_histogram(name, p, bins='auto')
+        print(self.evaluator.confusion_matrix)
         return {
             'val_loss': total_val_loss / len(self.valid_data_loader),
-            'val_metrics': (total_val_metrics / len(self.valid_data_loader)).tolist()
+            # 'val_metrics': (total_val_metrics / len(self.valid_data_loader)).tolist()
+            'val_metrics': total_val_metrics.tolist()
         }
 
     def _progress(self, batch_idx):

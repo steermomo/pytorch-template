@@ -3,7 +3,6 @@ import random
 import numpy as np
 import cv2
 from PIL import Image, ImageOps, ImageFilter
-import albumentations as alb
 from albumentations import (
     PadIfNeeded,
     HorizontalFlip,
@@ -74,10 +73,6 @@ class RandomHorizontalFlip(object):
         mask = sample['label']
         if random.random() < 0.5:
             img = cv2.flip(img, 0)
-            mask = cv2.flip(mask, 0)
-            # img = img.transpose(Image.FLIP_LEFT_RIGHT)
-            # mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
-
         return {'image': img,
                 'label': mask}
 
@@ -88,9 +83,6 @@ class RandomVertFlip:
         mask = sample['label']
         if random.random() < 0.5:
             img = cv2.flip(img, 1)
-            mask = cv2.flip(mask, 1)
-            # img = img.transpose(Image.FLIP_TOP_BOTTOM)
-            # mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
 
         return {'image': img,
                 'label': mask}
@@ -99,14 +91,12 @@ class RandomVertFlip:
 class RandomRotate(object):
     def __init__(self, degree):
         self.degree = degree
-        self.aug = alb.Rotate(limit=degree)
 
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        augmented = self.aug(image=img, mask=mask)
-        img = augmented['image']
-        mask = augmented['mask']   
+        rotate_degree = random.uniform(-1 * self.degree, self.degree)
+        img = cv2.rotate(img, rotate_degree)
 
         return {'image': img,
                 'label': mask}
@@ -116,17 +106,11 @@ class RandomRoll:
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        rolled = False
         r, c, ch = img.shape
         if random.random() < 0.5:
             sh = random.randint(-c, c)
             img = np.roll(img, sh, axis=1)
-            mask = np.roll(mask, sh, axis=1)
-            # rolled = True
-        # if random.random() < 0.5 and not rolled:
-        #     sh = random.randint(-r, r)
-        #     img = np.roll(img, sh, axis=0)
-        #     mask = np.roll(mask, sh, axis=0)
+
         return {'image': img,
                 'label': mask}
 
@@ -141,15 +125,13 @@ class RandomGridTr:
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        # img = np.array(img).astype(np.uint8)
-        # mask = np.array(mask).astype(np.uint8)
 
-        augmented = self.aug(image=img, mask=mask)
+        augmented = self.aug(image=img)
         image_elastic = augmented['image']
-        mask_elastic = augmented['mask']
+        # mask_elastic = augmented['mask']
         return {
             'image': image_elastic,
-            'label': mask_elastic
+            'label': mask
         }
 
 
@@ -163,22 +145,20 @@ class RandomComp:
             CLAHE(),
             OneOf([
                 GaussNoise(),
-                Cutout(num_holes=10, max_h_size=5, max_w_size=5)
+                Cutout(num_holes=10, max_h_size=10, max_w_size=10)
             ])
         ])
 
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        # img = np.array(img).astype(np.uint8)
-        # mask = np.array(mask).astype(np.float32)
 
-        augmented = self.aug(image=img, mask=mask)
+        augmented = self.aug(image=img)
         image_elastic = augmented['image']
-        mask_elastic = augmented['mask']
+        # mask_elastic = augmented['mask']
         return {
             'image': image_elastic,
-            'label': mask_elastic
+            'label': mask
         }
 
 
@@ -186,47 +166,62 @@ class RandomScaleCrop(object):
     def __init__(self, base_size, crop_size, fill=0):
         self.base_size = base_size
         self.crop_size = crop_size
-        self.base_height = base_size[0]
         self.fill = fill
-        self.aug = alb.Compose([
-            alb.RandomScale(),
-            alb.PadIfNeeded(min_height=base_size[0], min_width=base_size[1], border_mode=cv2.BORDER_REFLECT101),
-            alb.RandomCrop(height=base_size[0], width=base_size[1])
-        ])
 
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
-        # print(f'===>{img.shape}')
-        augmented = self.aug(image=img, mask=mask)
-        image_aug = augmented['image']
-        mask_aug = augmented['mask']
-        return {
-            'image': image_aug,
-            'label': mask_aug
-        }
+        # random scale (short edge)
+        short_size = random.randint(int(self.base_size[0] * 0.5), int(self.base_size[0] * 1.1))
+        h, w, _ = img.shape
+        if h > w:
+            ow = short_size
+            oh = int(1.0 * h * ow / w)
+        else:
+            oh = short_size
+            ow = int(1.0 * w * oh / h)
+        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
+
+        # pad crop
+        if short_size < self.crop_size[0]:
+            padh = self.crop_size[0] - oh if oh < self.crop_size[0] else 0
+            padw = self.crop_size[1] - ow if ow < self.crop_size[1] else 0
+            img = np.pad(img, pad_width=(0, 0, padh, padw), constant_values=0)
+
+        # random crop crop_size
+        h, w, _ = img.shape
+        x1 = random.randint(0, w - self.crop_size[1])
+        y1 = random.randint(0, h - self.crop_size[0])
+        img = img[y1:y1 + self.crop_size[0], x1:x1 + self.crop_size[1]].copy()
+
+        return {'image': img,
+                'label': mask}
 
 
 class FixScaleCrop(object):
     def __init__(self, crop_size):
         self.crop_size = crop_size
-        self.aug = alb.Compose([
-            alb.Resize(height=crop_size[0], width=crop_size[1])
-        ])
 
     def __call__(self, sample):
         img = sample['image']
         mask = sample['label']
+        h, w, _ = img.shape
+        if w > h:
+            oh = self.crop_size[0]
+            ow = int(1.0 * w * oh / h)
+        else:
+            ow = self.crop_size[1]
+            oh = int(1.0 * h * ow / w)
+        img = cv2.resize(img, (ow, oh), interpolation=cv2.INTER_LINEAR)
 
-        augmented = self.aug(image=img, mask=mask)
+        # center crop
+        h, w, _ = img.shape
+        x1 = int(round((w - self.crop_size[1]) / 2.))
+        y1 = int(round((h - self.crop_size[0]) / 2.))
+        img = img[y1:y1 + self.crop_size[0], x1:x1 + self.crop_size[1]].copy()
 
-        image_aug = augmented['image']
-        mask_aug = augmented['mask']
-
-        return {
-            'image': image_aug,
-            'label': mask_aug
-        }
+        return {'image': img,
+                'label': mask}
 
 
 class FixedResize(object):
@@ -240,7 +235,6 @@ class FixedResize(object):
         assert img.size == mask.size
 
         img = img.resize(self.size, Image.BILINEAR)
-        mask = mask.resize(self.size, Image.NEAREST)
 
         return {'image': img,
                 'label': mask}

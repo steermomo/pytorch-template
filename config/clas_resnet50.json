@@ -1,0 +1,62 @@
+{
+    "name": "Kaggle_steel_clas_resnet50",
+    "n_gpu": 2,
+
+    "arch": {
+        "type": "Unet_resnet50",
+        "args": {}
+    },
+    "data_loader": {
+        "type": "make_data_loader",
+        "args":{
+            "dataset": "steel",
+            "data_dir": "/data2/hangli_data/kaggle/steel/data",
+            "batch_size": 60,
+            "shuffle": true,
+            "prefix": "clas_",
+            "num_workers": 12,
+            "base_size": [256, 1600],
+            "crop_size": [128, 800]
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": true
+        }
+    },
+    "use_balanced_weights": true,
+    "loss": {
+        "type": "ClassificationLosses",
+        "args": {
+            "size_average": true, 
+            "batch_average": true, 
+            "ignore_index": 255, 
+            "cuda": true
+        },
+        "mode": "ce"
+    },
+    "evaluator": "ClasEvaluator",
+    "lr_scheduler": {
+        "type": "StepLR",
+        "args": {
+            "step_size": 50,
+            "gamma": 0.1
+        }
+    },
+    "trainer_type": "Trainer",
+    "trainer": {
+        "epochs": 200,
+
+        "save_dir": "saved/",
+        "save_period": 1,
+        "verbosity": 1,
+        
+        "monitor": "min val_loss",
+        "early_stop": 50,
+
+        "tensorboard": true
+    }
+}

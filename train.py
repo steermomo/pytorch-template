@@ -13,6 +13,8 @@ from utils.calculate_weights import calculate_weigths_labels
 # from trainer import Trainer
 import trainer
 
+torch.backends.cudnn.benchmark = True
+
 
 def main(config):
     logger = config.get_logger('train')
@@ -39,6 +41,7 @@ def main(config):
         weight = torch.from_numpy(weight.astype(np.float32))
     else:
         weight = None
+    print(weight)
     loss = config.initialize('loss', module_loss, weight).build_loss(mode=config['loss']['mode'])
 
     evaluator = getattr(module_metric, config['evaluator'])(num_class=nclass)
@@ -68,6 +71,7 @@ if __name__ == '__main__':
                       help='path to latest checkpoint (default: None)')
     args.add_argument('-d', '--device', default=None, type=str,
                       help='indices of GPUs to enable (default: all)')
+    args.add_argument('-f', '--ft', default=False, action="store_true", )
 
     # custom cli options to modify configuration from default values given in json file.
     CustomArgs = collections.namedtuple('CustomArgs', 'flags type target')

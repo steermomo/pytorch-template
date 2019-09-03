@@ -14,7 +14,8 @@ class ConfigParser:
         for opt in options:
             args.add_argument(*opt.flags, default=None, type=opt.type)
         args = args.parse_args()
-
+        
+        self.ft = args.ft
         if args.device:
             os.environ["CUDA_VISIBLE_DEVICES"] = args.device
         if args.resume:
