@@ -1,9 +1,9 @@
 {
-    "name": "Kaggle_steel",
-    "n_gpu": 1,
+    "name": "Kaggle_steel_Unet_resnet50",
+    "n_gpu": 2,
 
     "arch": {
-        "type": "Unet_resnet34",
+        "type": "Unet_resnet50",
         "args": {}
     },
     "data_loader": {
@@ -11,11 +11,12 @@
         "args":{
             "dataset": "steel",
             "data_dir": "/data2/hangli_data/kaggle/steel/data",
-            "batch_size": 40,
+            "batch_size": 16,
             "shuffle": true,
-            "num_workers": 2,
+            "num_workers": 6,
             "base_size": [256, 1600],
-            "crop_size": [128, 800]
+            "crop_size": [256, 1600],
+            "NUM_CLASSES": 4
         }
     },
     "optimizer": {
@@ -26,7 +27,7 @@
             "amsgrad": true
         }
     },
-    "use_balanced_weights": true,
+    "use_balanced_weights": false,
     "loss": {
         "type": "SegmentationLosses",
         "args": {
@@ -35,26 +36,26 @@
             "ignore_index": 255, 
             "cuda": true
         },
-        "mode": "ce"
+        "mode": "bce"
     },
-    "evaluator": "SegEvaluator",
+    "evaluator": "SteelEvaluator",
     "lr_scheduler": {
         "type": "StepLR",
         "args": {
             "step_size": 50,
-            "gamma": 0.1
+            "gamma": 0.5
         }
     },
     "trainer_type": "SegTrainer",
     "trainer": {
-        "epochs": 100,
+        "epochs": 200,
 
         "save_dir": "saved/",
         "save_period": 1,
         "verbosity": 1,
         
         "monitor": "min val_loss",
-        "early_stop": 10,
+        "early_stop": 50,
 
         "tensorboard": true
     }

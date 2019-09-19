@@ -74,13 +74,9 @@ class SegmentationLosses(object):
     def bce_loss(self, probas, labels):
         n, c, h, w = probas.shape
         # target = torch.zeros(n, c, h, w)
-        target = torch.zeros_like(probas, requires_grad=False)
-        one = torch.tensor(1, device=probas.device)
-        zero = torch.tensor(0, device=probas.device)
-        for c_idx in range(c):
-            target[:, c_idx, :, :] = torch.where(labels == c_idx, one, zero)
+       
         # probas_sigmoid = torch.sigmoid(probas)        
-        loss = nn.functional.binary_cross_entropy_with_logits(probas, target, reduction="none")
+        loss = nn.functional.binary_cross_entropy_with_logits(probas, labels, reduction="none")
         loss = torch.mean(loss, dim=0)
         if self.weight is not None:
             weight = self.weight.view(-1, c, 1, 1).to(probas.device)

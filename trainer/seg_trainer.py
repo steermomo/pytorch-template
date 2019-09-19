@@ -65,6 +65,9 @@ class SegTrainer(BaseTrainer):
 
             self.optimizer.zero_grad()
             output = self.model(data)
+            # print(f'output shape: {output.shape}, target shape: {target.shape}')
+            # print(torch.unique(target), target.shape)
+            # exit()
             loss = self.loss(output, target)
             loss.backward()
             self.optimizer.step()
@@ -75,10 +78,11 @@ class SegTrainer(BaseTrainer):
 
             tbar.set_description('Train loss: %.3f' % (total_loss / (batch_idx + 1)))
 
+            output = torch.sigmoid(output)
             output = output.data.cpu().numpy()
             target = target.cpu().numpy()
-            output = np.argmax(output, axis=1)
-
+            # output = np.argmax(output, axis=1)
+            
             self.evaluator.add_batch(target, output)
 
             if batch_idx % self.log_step == 0:
@@ -87,17 +91,15 @@ class SegTrainer(BaseTrainer):
                     self._progress(batch_idx),
                     loss.item()))
                 self.writer.add_image('input', make_grid(data.cpu()[:4], nrow=2, normalize=True))
-                grid = make_grid(decode_seg_map_sequence(output[:4], dataset=self.dataset), nrow=2, normalize=False)
+                grid = make_grid(decode_seg_map_sequence(np.argmax(output, axis=1)[:4], dataset=self.dataset), nrow=2, normalize=False)
                 self.writer.add_image('pred', grid)
-                grid = make_grid(decode_seg_map_sequence(target[:4], dataset=self.dataset), nrow=2, normalize=False)
+                # grid = make_grid(decode_seg_map_sequence(target[:4], dataset=self.dataset), nrow=2, normalize=False)
+                grid = make_grid(decode_seg_map_sequence(np.argmax(target[:4], axis=1), dataset=self.dataset), nrow=2, normalize=False)
                 self.writer.add_image('label', grid)
 
             if batch_idx == self.len_epoch:
                 break
 
-        if epoch == 0:
-            self.data_loader.dataset.set_use_cache(True)
-        
         print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.data_loader.batch_size + data.data.shape[0]))
         print('Loss: %.5f' % total_loss)
         self.writer.add_scalar_with_tag('loss_epoch/train', total_loss, epoch)
@@ -118,7 +120,6 @@ class SegTrainer(BaseTrainer):
 
         if self.lr_scheduler is not None:
             self.lr_scheduler.step()
-            
 
         return log
 
@@ -151,17 +152,19 @@ class SegTrainer(BaseTrainer):
 
                 tbar.set_description('Test  loss: %.3f' % (total_val_loss / (batch_idx + 1)))
 
+                output = torch.sigmoid(output)
                 output = output.data.cpu().numpy()
                 target = target.cpu().numpy()
-                output = np.argmax(output, axis=1)
+                # output = np.argmax(output, axis=1)
 
                 self.evaluator.add_batch(target, output)
                 if batch_idx % log_step == 0:
                     # total_val_metrics += self._eval_metrics(output, target)
                     self.writer.add_image('input', make_grid(data.cpu()[:4], nrow=2, normalize=True))
-                    grid = make_grid(decode_seg_map_sequence(output[:4], dataset=self.dataset), nrow=2, normalize=False)
+                    grid = make_grid(decode_seg_map_sequence(np.argmax(output, axis=1)[:4], dataset=self.dataset), nrow=2, normalize=False)
                     self.writer.add_image('pred', grid)
-                    grid = make_grid(decode_seg_map_sequence(target[:4], dataset=self.dataset), nrow=2, normalize=False)
+                    # grid = make_grid(decode_seg_map_sequence(target[:4], dataset=self.dataset), nrow=2, normalize=False)
+                    grid = make_grid(decode_seg_map_sequence(np.argmax(target[:4], axis=1), dataset=self.dataset), nrow=2, normalize=False)
                     self.writer.add_image('label', grid)
 
         print('[Epoch: %d, numImages: %5d]' % (epoch, batch_idx * self.valid_data_loader.batch_size + data.data.shape[0]))

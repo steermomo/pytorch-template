@@ -15,8 +15,8 @@ class BaseTrainer:
         # setup GPU device if available, move model into configured device
         self.device, device_ids = self._prepare_device(config['n_gpu'])
         self.model = model.to(self.device)
-        if len(device_ids) > 1:
-            self.model = torch.nn.DataParallel(model, device_ids=device_ids)
+        # if len(device_ids) > 1:
+        self.model = torch.nn.DataParallel(model, device_ids=device_ids)
 
         self.loss = loss
         self.evaluator = evaluator
@@ -61,6 +61,7 @@ class BaseTrainer:
         """
         Full training logic
         """
+        not_improved_count = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
             result = self._train_epoch(epoch)
 

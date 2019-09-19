@@ -24,6 +24,7 @@ def main(config):
 
     # build model architecture, then print to console
     model = config.initialize('arch', module_arch, nclass)
+    print(f'nclass: {nclass}')
     # logger.debug(model)
 
     # get function handles of loss and metrics

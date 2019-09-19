@@ -2,6 +2,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from base import BaseModel
 import segmentation_models_pytorch as smp
+# from deeplabv3 import DeepLab
+from model.deeplabv3 import DeepLab
 
 
 class MnistModel(BaseModel):
@@ -36,6 +38,7 @@ class Unet_resnet34(BaseModel):
 class Unet_resnet50(BaseModel):
     def __init__(self, nclass=5):
         super().__init__()
+        print(f'load unet resnet50, nclass: {nclass}')
         self.model = smp.Unet('resnet50', classes=nclass, activation=None)
         # model = smp.Unet('resnet34', classes=3, activation='softmax')
 
@@ -43,3 +46,19 @@ class Unet_resnet50(BaseModel):
         return self.model(x)
 
 
+class FPN_Resnet34(BaseModel):
+    def __init__(self, nclass=4):
+        super(FPN_Resnet34, self).__init__()
+        self.model = smp.FPN('resnet34', classes=nclass, activation=None)
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class DeeplabV3Resnet(BaseModel):
+    def __init__(self, nclass=5):
+        super(DeeplabV3Resnet, self).__init__()
+        self.model = DeepLab(num_classes=nclass, backbone='resnet', output_stride=16, sync_bn=True)
+
+    def forward(self, x):
+        return self.model(x)

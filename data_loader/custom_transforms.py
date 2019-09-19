@@ -49,7 +49,7 @@ class Normalize(object):
                 'label': mask}
 
 
-class ToTensor(object):
+class ToTensorSdimMask(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
@@ -66,6 +66,50 @@ class ToTensor(object):
 
         return {'image': img,
                 'label': mask}
+
+
+class ToTensorMdimMask(object):
+    """Convert ndarrays in sample to Tensors."""
+
+    def __call__(self, sample):
+        # swap color axis because
+        # numpy image: H x W x C
+        # torch image: C X H X W
+        img = sample['image']
+        mask = sample['label']
+        img = np.array(img).astype(np.float32).transpose((2, 0, 1))
+        mask = np.array(mask).astype(np.float32).transpose((2, 0, 1))
+
+        img = torch.from_numpy(img).float()
+        mask = torch.from_numpy(mask).float()
+
+        return {'image': img,
+                'label': mask}
+
+
+class Noop:
+    def __call__(self, sample):
+        return sample
+
+
+class MaskToMultiDim:
+    def __init__(self, nclass=5):
+        self.nclass = nclass
+
+    def __call__(self, sample):
+        img = sample['image']
+        mask = sample['label']
+
+        r, c, _ = img.shape
+        target = np.zeros((r, c, self.nclass))
+
+        for c_idx in range(self.nclass):
+            target[:, :, c_idx] = np.where(mask == c_idx, 1, 0)
+
+        return {
+            'image': img,
+            'label': target
+        }
 
 
 class RandomHorizontalFlip(object):
@@ -106,7 +150,7 @@ class RandomRotate(object):
         mask = sample['label']
         augmented = self.aug(image=img, mask=mask)
         img = augmented['image']
-        mask = augmented['mask']   
+        mask = augmented['mask']
 
         return {'image': img,
                 'label': mask}
